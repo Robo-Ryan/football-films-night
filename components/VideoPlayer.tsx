@@ -127,6 +127,7 @@ export default function VideoPlayer({ src, title, videos = [], currentId, onSele
             setDuration(e.currentTarget.duration || 0);
             e.currentTarget.playbackRate = speed;
           }}
+          tabIndex={-1}
           playsInline
         />
       ) : (
