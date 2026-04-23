@@ -91,11 +91,13 @@ export default function VideoPlayer({ src, title, videos = [], currentId, onSele
       } else if (e.key === "f" || e.key === "F") {
         toggleFullscreen();
       } else if (e.key === "ArrowLeft" && !e.shiftKey) {
+        e.preventDefault();
         const v = videoRef.current;
-        if (v) v.currentTime = Math.max(0, v.currentTime - 2);
+        if (v) v.currentTime = Math.max(0, v.currentTime - 1 / 30);
       } else if (e.key === "ArrowRight" && !e.shiftKey) {
+        e.preventDefault();
         const v = videoRef.current;
-        if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 2);
+        if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 1 / 30);
       } else if ((e.key === "ArrowRight" && e.shiftKey) || e.key === "n") {
         if (nextVideo && onSelect) onSelect(nextVideo.id);
       } else if ((e.key === "ArrowLeft" && e.shiftKey) || e.key === "p") {
@@ -240,7 +242,7 @@ export default function VideoPlayer({ src, title, videos = [], currentId, onSele
         {/* Fullscreen keyboard hint */}
         {isFullscreen && (
           <div className="mt-3 text-white/40 text-sm">
-            Shift+← prev · Shift+→ next · ← → skip 2s · Space play/pause
+            Shift+← prev · Shift+→ next · ← → frame-by-frame · Space play/pause
           </div>
         )}
       </div>

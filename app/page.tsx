@@ -98,13 +98,29 @@ export default function HostPage() {
           <h1 className="text-2xl md:text-3xl font-bold">Films Night</h1>
           <p className="text-white/60 text-sm">Team film review. Queue it up.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={loadQueue}
             className="px-3 py-2 rounded bg-white/10 hover:bg-white/20 text-sm"
           >
             {loading ? "Refreshing…" : "Refresh queue"}
+          </button>
+          <button
+            type="button"
+            disabled={videos.length === 0}
+            onClick={() => {
+              const base =
+                process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+                window.location.origin;
+              const url = `${base}/watch`;
+              navigator.clipboard.writeText(url).then(() => {
+                alert(`Replay link copied!\n\n${url}\n\nSend this to the team.`);
+              });
+            }}
+            className="px-3 py-2 rounded bg-yellow-400 text-black font-semibold hover:bg-yellow-300 disabled:opacity-40 text-sm"
+          >
+            Share replay link
           </button>
           <button
             type="button"
@@ -132,16 +148,16 @@ export default function HostPage() {
             currentId={currentId}
             onSelect={handleSelect}
           />
-          <div className="mt-3 text-sm text-white/60">
+          <div className="hidden md:block mt-3 text-sm text-white/60">
             Keyboard: <span className="text-white/80">Space</span> play/pause ·{" "}
             <span className="text-white/80">F</span> fullscreen ·{" "}
-            <span className="text-white/80">← →</span> skip 2s ·{" "}
+            <span className="text-white/80">← →</span> frame-by-frame ·{" "}
             <span className="text-white/80">Shift+← →</span> prev/next
           </div>
         </section>
 
         <aside className="flex flex-col gap-4">
-          <div className="flex gap-4">
+          <div className="hidden md:flex gap-4">
             <QRDisplay />
             <div className="flex-1 text-sm text-white/70">
               <div className="font-semibold text-white mb-1">How it works</div>
