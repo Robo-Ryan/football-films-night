@@ -9,6 +9,54 @@ type FileStatus = {
   error?: string;
 };
 
+async function getVideoMeta(
+  file: File
+): Promise<{ duration: number; thumbnailBlob: Blob | null }> {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    const url = URL.createObjectURL(file);
+    video.src = url;
+
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(1, video.duration * 0.1);
+    };
+
+    video.onseeked = () => {
+      const duration = video.duration || 0;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 320;
+        canvas.height = 180;
+        const ctx = canvas.getContext("2d");
+        if (ctx) ctx.drawImage(video, 0, 0, 320, 180);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(
+          (blob) => resolve({ duration, thumbnailBlob: blob }),
+          "image/jpeg",
+          0.7
+        );
+      } catch {
+        URL.revokeObjectURL(url);
+        resolve({ duration, thumbnailBlob: null });
+      }
+    };
+
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve({ duration: 0, thumbnailBlob: null });
+    };
+
+    // Fallback if seek never fires
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      resolve({ duration: video.duration || 0, thumbnailBlob: null });
+    }, 8000);
+  });
+}
+
 export default function UploadPage() {
   const [name, setName] = useState("");
   const [files, setFiles] = useState<FileStatus[]>([]);
@@ -28,7 +76,10 @@ export default function UploadPage() {
 
   const addMore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? []);
-    setFiles((prev) => [...prev, ...picked.map<FileStatus>((file) => ({ file, status: "pending" }))]);
+    setFiles((prev) => [
+      ...prev,
+      ...picked.map<FileStatus>((file) => ({ file, status: "pending" })),
+    ]);
   };
 
   const removeFile = (idx: number) => {
@@ -43,7 +94,6 @@ export default function UploadPage() {
     localStorage.setItem("films-night-name", trimmed);
     setSubmitting(true);
 
-    // Find the highest position so new uploads go to the end of the queue.
     const all = await getVideos();
     const maxPos = all.reduce(
       (max, v) => Math.max(max, (v as any)?.position ?? 0),
@@ -64,15 +114,31 @@ export default function UploadPage() {
       try {
         const ext = entry.file.name.split(".").pop() || "mp4";
         const safeName = trimmed.replace(/[^a-z0-9-]+/gi, "_").toLowerCase();
-        const path = `${Date.now()}-${safeName}-${i}.${ext}`;
+        const timestamp = Date.now();
+        const videoPath = `${timestamp}-${safeName}-${i}.${ext}`;
 
-        const videoUrl = await uploadFile(entry.file, path);
+        // Get duration + thumbnail before uploading
+        const { duration, thumbnailBlob } = await getVideoMeta(entry.file);
+
+        // Upload thumbnail if we got one
+        let thumbnail_url: string | undefined;
+        if (thumbnailBlob) {
+          const thumbPath = `${timestamp}-${safeName}-${i}-thumb.jpg`;
+          thumbnail_url = await uploadFile(
+            new File([thumbnailBlob], thumbPath, { type: "image/jpeg" }),
+            thumbPath
+          );
+        }
+
+        const videoUrl = await uploadFile(entry.file, videoPath);
 
         await addVideo({
           uploader_name: trimmed,
-          storage_path: path,
+          storage_path: videoPath,
           video_url: videoUrl,
           position: nextPos,
+          duration: duration || undefined,
+          thumbnail_url,
         });
 
         nextPos += 1;
@@ -103,7 +169,9 @@ export default function UploadPage() {
       {allDone && !submitting ? (
         <div className="rounded-lg bg-green-500/20 border border-green-500/40 p-6 text-center">
           <div className="text-4xl mb-2">✓</div>
-          <div className="text-lg font-semibold">Uploaded {doneCount} clip{doneCount === 1 ? "" : "s"}</div>
+          <div className="text-lg font-semibold">
+            Uploaded {doneCount} clip{doneCount === 1 ? "" : "s"}
+          </div>
           <div className="text-white/70 text-sm mt-1 mb-4">
             You're in the queue. Go find a seat.
           </div>
@@ -143,7 +211,9 @@ export default function UploadPage() {
               disabled={submitting}
               className="block w-full text-sm text-white/80 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-white file:text-black hover:file:bg-white/90 file:cursor-pointer"
             />
-            <span className="text-xs text-white/50">Pick multiple at once from your gallery.</span>
+            <span className="text-xs text-white/50">
+              Pick multiple at once from your gallery.
+            </span>
           </label>
 
           {files.length > 0 && (

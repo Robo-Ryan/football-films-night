@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Video } from "@/lib/types";
 
 const SPEEDS = [0.2, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
 type Props = {
   src: string | null;
   title?: string;
+  videos?: Video[];
+  currentId?: string | null;
+  onSelect?: (id: string) => void;
 };
 
 function formatTime(seconds: number) {
@@ -16,7 +20,7 @@ function formatTime(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function VideoPlayer({ src, title }: Props) {
+export default function VideoPlayer({ src, title, videos = [], currentId, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -24,6 +28,10 @@ export default function VideoPlayer({ src, title }: Props) {
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const currentIndex = videos.findIndex((v) => v.id === currentId);
+  const prevVideo = currentIndex > 0 ? videos[currentIndex - 1] : null;
+  const nextVideo = currentIndex >= 0 && currentIndex < videos.length - 1 ? videos[currentIndex + 1] : null;
 
   // Reset player state when the source changes.
   useEffect(() => {
@@ -34,12 +42,10 @@ export default function VideoPlayer({ src, title }: Props) {
     setIsPlaying(false);
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep video element in sync with chosen playback rate.
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed;
   }, [speed]);
 
-  // Track fullscreen state so the UI can adapt (larger buttons, etc.).
   useEffect(() => {
     const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", handler);
@@ -74,34 +80,38 @@ export default function VideoPlayer({ src, title }: Props) {
     setCurrentTime(t);
   };
 
-  // Keyboard shortcuts — space to play/pause, f for fullscreen, arrows to seek.
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
-        return;
-      }
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       if (e.code === "Space") {
         e.preventDefault();
         togglePlay();
       } else if (e.key === "f" || e.key === "F") {
         toggleFullscreen();
-      } else if (e.key === "ArrowLeft") {
+      } else if (e.key === "ArrowLeft" && !e.shiftKey) {
         const v = videoRef.current;
         if (v) v.currentTime = Math.max(0, v.currentTime - 2);
-      } else if (e.key === "ArrowRight") {
+      } else if (e.key === "ArrowRight" && !e.shiftKey) {
         const v = videoRef.current;
         if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 2);
+      } else if ((e.key === "ArrowRight" && e.shiftKey) || e.key === "n") {
+        if (nextVideo && onSelect) onSelect(nextVideo.id);
+      } else if ((e.key === "ArrowLeft" && e.shiftKey) || e.key === "p") {
+        if (prevVideo && onSelect) onSelect(prevVideo.id);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [togglePlay, toggleFullscreen]);
+  }, [togglePlay, toggleFullscreen, nextVideo, prevVideo, onSelect]);
+
+  const btnBase = isFullscreen ? "px-5 py-3 text-lg rounded" : "px-4 py-2 text-sm rounded";
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full bg-black rounded-lg overflow-hidden group"
+      className="relative w-full bg-black rounded-lg overflow-hidden"
       style={{ aspectRatio: isFullscreen ? undefined : "16/9" }}
     >
       {src ? (
@@ -125,8 +135,7 @@ export default function VideoPlayer({ src, title }: Props) {
         </div>
       )}
 
-      {/* Controls overlay — sits inside the fullscreened container so it shows
-          in fullscreen too. */}
+      {/* Controls overlay */}
       <div
         className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent ${
           isFullscreen ? "p-6" : "p-3"
@@ -138,6 +147,7 @@ export default function VideoPlayer({ src, title }: Props) {
           </div>
         )}
 
+        {/* Scrub bar */}
         <div className="flex items-center gap-3 mb-2">
           <span className={`text-white/80 tabular-nums ${isFullscreen ? "text-base" : "text-xs"}`}>
             {formatTime(currentTime)}
@@ -157,29 +167,54 @@ export default function VideoPlayer({ src, title }: Props) {
           </span>
         </div>
 
+        {/* Buttons row */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Prev — only show in fullscreen */}
+            {isFullscreen && (
+              <button
+                type="button"
+                onClick={() => prevVideo && onSelect?.(prevVideo.id)}
+                disabled={!prevVideo}
+                className={`${btnBase} bg-white/10 text-white hover:bg-white/20 disabled:opacity-30`}
+                title="Previous (Shift+← or P)"
+              >
+                ← Prev
+              </button>
+            )}
+
             <button
               type="button"
               onClick={togglePlay}
               disabled={!src}
-              className={`bg-white text-black font-semibold rounded disabled:opacity-40 ${
-                isFullscreen ? "px-6 py-3 text-lg" : "px-4 py-2 text-sm"
-              }`}
+              className={`${btnBase} bg-white text-black font-semibold disabled:opacity-40`}
             >
               {isPlaying ? "Pause" : "Play"}
             </button>
+
+            {/* Next — only show in fullscreen */}
+            {isFullscreen && (
+              <button
+                type="button"
+                onClick={() => nextVideo && onSelect?.(nextVideo.id)}
+                disabled={!nextVideo}
+                className={`${btnBase} bg-white/10 text-white hover:bg-white/20 disabled:opacity-30`}
+                title="Next (Shift+→ or N)"
+              >
+                Next →
+              </button>
+            )}
+
             <button
               type="button"
               onClick={toggleFullscreen}
-              className={`bg-white/10 text-white rounded hover:bg-white/20 ${
-                isFullscreen ? "px-6 py-3 text-lg" : "px-4 py-2 text-sm"
-              }`}
+              className={`${btnBase} bg-white/10 text-white hover:bg-white/20`}
             >
               {isFullscreen ? "Exit Full" : "Fullscreen"}
             </button>
           </div>
 
+          {/* Speed buttons */}
           <div className="flex items-center gap-1 flex-wrap">
             {SPEEDS.map((s) => (
               <button
@@ -200,6 +235,13 @@ export default function VideoPlayer({ src, title }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Fullscreen keyboard hint */}
+        {isFullscreen && (
+          <div className="mt-3 text-white/40 text-sm">
+            Shift+← prev · Shift+→ next · ← → skip 2s · Space play/pause
+          </div>
+        )}
       </div>
     </div>
   );

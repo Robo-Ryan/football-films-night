@@ -55,6 +55,8 @@ export async function addVideo(data: {
   storage_path: string;
   video_url: string;
   position: number;
+  duration?: number;
+  thumbnail_url?: string;
 }) {
   return addDoc(collection(db, VIDEOS_COLLECTION), {
     ...data,

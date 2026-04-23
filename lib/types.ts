@@ -4,5 +4,7 @@ export type Video = {
   storage_path: string;
   video_url: string;
   position: number;
+  duration?: number;
+  thumbnail_url?: string;
   created_at?: Date | { toDate(): Date };
 };

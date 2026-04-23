@@ -128,11 +128,15 @@ export default function HostPage() {
           <VideoPlayer
             src={current?.video_url ?? null}
             title={current ? `${current.uploader_name}'s clip` : undefined}
+            videos={videos}
+            currentId={currentId}
+            onSelect={handleSelect}
           />
           <div className="mt-3 text-sm text-white/60">
             Keyboard: <span className="text-white/80">Space</span> play/pause ·{" "}
             <span className="text-white/80">F</span> fullscreen ·{" "}
-            <span className="text-white/80">← →</span> skip 2s
+            <span className="text-white/80">← →</span> skip 2s ·{" "}
+            <span className="text-white/80">Shift+← →</span> prev/next
           </div>
         </section>
 

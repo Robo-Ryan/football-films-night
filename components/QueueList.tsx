@@ -27,6 +27,13 @@ type Props = {
   onReorder: (orderedIds: string[]) => void;
 };
 
+function formatDuration(seconds: number) {
+  if (!seconds || !Number.isFinite(seconds)) return null;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function Row({
   video,
   index,
@@ -40,9 +47,8 @@ function Row({
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: video.id,
-  });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: video.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -50,11 +56,13 @@ function Row({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const durationLabel = video.duration ? formatDuration(video.duration) : null;
+
   return (
     <li
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 p-3 rounded-lg border ${
+      className={`flex items-center gap-2 p-2 rounded-lg border ${
         isCurrent
           ? "border-yellow-400 bg-yellow-400/10"
           : "border-white/10 bg-white/5 hover:bg-white/10"
@@ -62,39 +70,52 @@ function Row({
     >
       <button
         type="button"
-        className="text-white/40 hover:text-white/80 cursor-grab active:cursor-grabbing px-1"
+        className="text-white/40 hover:text-white/80 cursor-grab active:cursor-grabbing px-1 shrink-0"
         aria-label="Drag to reorder"
         {...attributes}
         {...listeners}
       >
         ⋮⋮
       </button>
-      <div className="text-white/50 tabular-nums w-6 text-sm">{index + 1}.</div>
-      <div className="flex-1 min-w-0">
-        <div className="font-semibold truncate">{video.uploader_name}</div>
-        <div className="text-xs text-white/50">
-          {(() => {
-            const ts = video.created_at;
-            const date =
-              ts instanceof Date
-                ? ts
-                : ts && typeof ts === "object" && "toDate" in ts
-                  ? ts.toDate()
-                  : null;
-            return date
-              ? date.toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })
-              : "?";
-          })()}
-        </div>
+
+      <div className="text-white/50 tabular-nums w-5 text-sm shrink-0">{index + 1}.</div>
+
+      {/* Thumbnail */}
+      <div className="w-16 h-9 rounded overflow-hidden bg-white/10 shrink-0 relative">
+        {video.thumbnail_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={video.thumbnail_url}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-white/20 text-lg">
+            ▶
+          </div>
+        )}
+        {durationLabel && (
+          <div className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] px-1 leading-4 rounded-tl">
+            {durationLabel}
+          </div>
+        )}
       </div>
+
+      {/* Name */}
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold truncate text-sm">{video.uploader_name}</div>
+        {durationLabel && (
+          <div className="text-xs text-white/50">{durationLabel}</div>
+        )}
+      </div>
+
       <button
         type="button"
         onClick={() => onSelect(video.id)}
-        className={`px-3 py-1 rounded text-sm font-semibold ${
-          isCurrent ? "bg-yellow-400 text-black" : "bg-white text-black hover:bg-white/90"
+        className={`px-3 py-1 rounded text-sm font-semibold shrink-0 ${
+          isCurrent
+            ? "bg-yellow-400 text-black"
+            : "bg-white text-black hover:bg-white/90"
         }`}
       >
         {isCurrent ? "Playing" : "Play"}
@@ -106,7 +127,7 @@ function Row({
             onDelete(video.id);
           }
         }}
-        className="px-2 py-1 rounded text-sm bg-red-500/20 text-red-300 hover:bg-red-500/30"
+        className="px-2 py-1 rounded text-sm bg-red-500/20 text-red-300 hover:bg-red-500/30 shrink-0"
         aria-label="Delete"
       >
         ✕
