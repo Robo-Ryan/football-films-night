@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import VideoPlayer from "@/components/VideoPlayer";
 import QueueList from "@/components/QueueList";
 import QRDisplay from "@/components/QRDisplay";
-import { supabase, BUCKET } from "@/lib/supabase";
+import {
+  getVideos,
+  deleteVideo,
+  updateVideoPosition,
+  deleteFile,
+} from "@/lib/firebase";
 import type { Video } from "@/lib/types";
 
 export default function HostPage() {
@@ -16,16 +21,13 @@ export default function HostPage() {
   const loadQueue = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error } = await supabase
-      .from("videos")
-      .select("*")
-      .order("position", { ascending: true });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
+    try {
+      const data = await getVideos();
+      setVideos((data as Video[]) ?? []);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load queue";
+      setError(msg);
     }
-    setVideos((data as Video[]) ?? []);
     setLoading(false);
   }, []);
 
@@ -41,14 +43,15 @@ export default function HostPage() {
     const target = videos.find((v) => v.id === id);
     if (!target) return;
 
-    // Optimistic UI update.
     setVideos((prev) => prev.filter((v) => v.id !== id));
     if (currentId === id) setCurrentId(null);
 
-    await supabase.storage.from(BUCKET).remove([target.storage_path]);
-    const { error } = await supabase.from("videos").delete().eq("id", id);
-    if (error) {
-      setError(error.message);
+    try {
+      await deleteFile(target.storage_path);
+      await deleteVideo(id);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Delete failed";
+      setError(msg);
       loadQueue();
     }
   };
@@ -63,13 +66,13 @@ export default function HostPage() {
       .filter((v): v is Video => v !== null);
     setVideos(reordered);
 
-    const updates = reordered.map((v) =>
-      supabase.from("videos").update({ position: v.position }).eq("id", v.id)
-    );
-    const results = await Promise.all(updates);
-    const firstError = results.find((r) => r.error);
-    if (firstError?.error) {
-      setError(firstError.error.message);
+    try {
+      await Promise.all(
+        reordered.map((v) => updateVideoPosition(v.id, v.position))
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Reorder failed";
+      setError(msg);
       loadQueue();
     }
   };
@@ -77,10 +80,15 @@ export default function HostPage() {
   const handleClearAll = async () => {
     if (!confirm("Clear the entire queue? This deletes all uploaded clips.")) return;
     const paths = videos.map((v) => v.storage_path);
-    if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
-    await supabase.from("videos").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    setVideos([]);
-    setCurrentId(null);
+    try {
+      await Promise.all(paths.map((p) => deleteFile(p)));
+      await Promise.all(videos.map((v) => deleteVideo(v.id)));
+      setVideos([]);
+      setCurrentId(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Clear failed";
+      setError(msg);
+    }
   };
 
   return (

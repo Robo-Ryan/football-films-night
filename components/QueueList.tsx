@@ -73,10 +73,21 @@ function Row({
       <div className="flex-1 min-w-0">
         <div className="font-semibold truncate">{video.uploader_name}</div>
         <div className="text-xs text-white/50">
-          {new Date(video.created_at).toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-          })}
+          {(() => {
+            const ts = video.created_at;
+            const date =
+              ts instanceof Date
+                ? ts
+                : ts && typeof ts === "object" && "toDate" in ts
+                  ? ts.toDate()
+                  : null;
+            return date
+              ? date.toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })
+              : "?";
+          })()}
         </div>
       </div>
       <button

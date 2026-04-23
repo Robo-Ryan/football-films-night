@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase, BUCKET } from "@/lib/supabase";
+import { getVideos, addVideo, uploadFile } from "@/lib/firebase";
 
 type FileStatus = {
   file: File;
@@ -44,12 +44,12 @@ export default function UploadPage() {
     setSubmitting(true);
 
     // Find the highest position so new uploads go to the end of the queue.
-    const { data: last } = await supabase
-      .from("videos")
-      .select("position")
-      .order("position", { ascending: false })
-      .limit(1);
-    let nextPos = (last?.[0]?.position ?? 0) + 1;
+    const all = await getVideos();
+    const maxPos = all.reduce(
+      (max, v) => Math.max(max, (v as any)?.position ?? 0),
+      -1
+    );
+    let nextPos = maxPos + 1;
 
     let successCount = 0;
     const updated = [...files];
@@ -66,23 +66,14 @@ export default function UploadPage() {
         const safeName = trimmed.replace(/[^a-z0-9-]+/gi, "_").toLowerCase();
         const path = `${Date.now()}-${safeName}-${i}.${ext}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, entry.file, {
-            contentType: entry.file.type || "video/mp4",
-            upsert: false,
-          });
-        if (uploadError) throw uploadError;
+        const videoUrl = await uploadFile(entry.file, path);
 
-        const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-
-        const { error: insertError } = await supabase.from("videos").insert({
+        await addVideo({
           uploader_name: trimmed,
           storage_path: path,
-          video_url: pub.publicUrl,
+          video_url: videoUrl,
           position: nextPos,
         });
-        if (insertError) throw insertError;
 
         nextPos += 1;
         successCount += 1;
