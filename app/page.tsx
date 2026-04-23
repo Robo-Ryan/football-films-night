@@ -106,23 +106,7 @@ export default function HostPage() {
           >
             {loading ? "Refreshing…" : "Refresh queue"}
           </button>
-          <button
-            type="button"
-            disabled={videos.length === 0}
-            onClick={() => {
-              const base =
-                process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-                window.location.origin;
-              const url = `${base}/watch`;
-              navigator.clipboard.writeText(url).then(() => {
-                alert(`Replay link copied!\n\n${url}\n\nSend this to the team.`);
-              });
-            }}
-            className="px-3 py-2 rounded bg-yellow-400 text-black font-semibold hover:bg-yellow-300 disabled:opacity-40 text-sm"
-          >
-            Share replay link
-          </button>
-          <button
+<button
             type="button"
             onClick={handleClearAll}
             disabled={videos.length === 0}
